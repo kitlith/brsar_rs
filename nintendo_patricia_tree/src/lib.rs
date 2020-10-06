@@ -51,6 +51,10 @@ impl<T: BinRead<Args=()>> PatriciaTree<T> {
 
         (&cur_node.data).into()
     }
+
+    pub fn get(&self, idx: usize) -> Option<&T> {
+        self.nodes.get(idx).map(|node| &node.data)
+    }
 }
 
 #[cfg(test)]

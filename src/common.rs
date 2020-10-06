@@ -6,14 +6,16 @@ use std::marker::PhantomData;
 use std::convert::TryFrom;
 
 use binread::{BinRead, BinReaderExt, FilePtr32, BinResult, ReadOptions};
-use binread::io::{Read, Seek};
+use binread::io::{Read, Seek, SeekFrom};
 use std::any::Any;
+use std::ops::{Deref, DerefMut};
 
 pub mod binread_utils {
     use binread::{BinRead, BinReaderExt, FilePtr8, BinResult, ReadOptions, FilePtr};
 
     use binread::io::{Cursor, Read, Seek};
     use binread::file_ptr::IntoSeekFrom;
+    use std::ops::{Deref, DerefMut};
 
     struct Relative<T: BinRead>(T);
 
@@ -97,10 +99,28 @@ pub mod binread_utils {
             temp_options.offset = 0;
 
             Ok(
-                AbsPtr::<Ptr, _>(
+                AbsPtr::<Ptr, BR>(
                     FilePtr::<Ptr, _>::parse(reader, &temp_options, (ro.offset, args))?
                 ).into_inner()
             )
+        }
+
+        pub fn ptr(&self) -> Ptr {
+            self.0.ptr
+        }
+    }
+
+    impl<Ptr: BinRead<Args = ()> + IntoSeekFrom, BR: BinRead> Deref for AbsPtr<Ptr, BR> {
+        type Target = BR;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0.deref().0
+        }
+    }
+
+    impl<Ptr: BinRead<Args = ()> + IntoSeekFrom, BR: BinRead> DerefMut for AbsPtr<Ptr, BR> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0.deref_mut().0
         }
     }
 
@@ -136,6 +156,65 @@ pub mod binread_utils {
             assert_eq!(test.a.into_inner(), 0xFF);
             assert_eq!(test.b.into_inner(), 0xFF);
         }
+
+        #[derive(BinRead)]
+        struct Wrapper<BR: BinRead<Args=()>>(BR);
+
+        #[test]
+        #[should_panic(expected = "Deref'd FilePtr before reading (make sure to use FilePtr::after_parse first)")] // TODO
+        fn file_ptr() {
+            let test: FilePtr8<u8> = Cursor::new([0x01, 0xFF]).read_be().unwrap();
+
+            // FAILS: after_parse was never called.
+            assert_eq!(*test, 0xFF);
+        }
+
+        #[test]
+        fn file_ptr_wrapper() {
+            let test: Wrapper<FilePtr8<u8>> = Cursor::new([0x01, 0xFF]).read_be().unwrap();
+
+            // PASSES: after_parse *was* called.
+            assert_eq!(*test.0, 0xFF);
+        }
+
+        #[test]
+        #[should_panic(expected = "Deref'd FilePtr before reading (make sure to use FilePtr::after_parse first)")] // TODO
+        fn nested_file_ptr() {
+            let test: Wrapper<FilePtr8<FilePtr8<u8>>> = Cursor::new([0x01, 0x02, 0xFF]).read_be().unwrap();
+
+            // FAILS: after_parse was never called.
+            assert_eq!(**test.0, 0xFF);
+        }
+
+        #[test]
+        fn nested_file_ptr_wrapper() {
+            let test: Wrapper<FilePtr8<Wrapper<FilePtr8<u8>>>> = Cursor::new([0x01, 0x02, 0xFF]).read_be().unwrap();
+
+            // PASSES: after_parse *was* called.
+            assert_eq!(*test.0.0, 0xFF);
+        }
+
+        #[derive(BinRead)]
+        struct Try<BR: BinRead<Args=()>>(
+            #[br(try)]
+            Option<BR>
+        );
+
+        #[test]
+        #[should_panic(expected = "Deref'd FilePtr before reading (make sure to use FilePtr::after_parse first)")]
+        fn try_file_ptr() {
+            let test: Try<FilePtr8<u8>> = Cursor::new([0x01, 0xFF]).read_be().unwrap();
+
+            // FAILS: after_parse was never called.
+            assert_eq!(*test.0.unwrap(), 0xFF)
+        }
+
+        #[test]
+        fn try_file_ptr_wrapper() {
+            let test: Try<Wrapper<FilePtr8<u8>>> = Cursor::new([0x01, 0xFF]).read_be().unwrap();
+
+            assert_eq!(*test.0.unwrap().0, 0xFF)
+        }
     }
 }
 
@@ -158,7 +237,7 @@ pub struct BlockPtr<BR: BinRead<Args=()>> {
     offset: u32,
     // the idea is that this makes r32 act the way we want
     // TODO: may need to do this somewhere else
-    #[br(offset = offset as u64 + 8)]
+    #[br(deref_now, offset = offset as u64 + 8)]
     pub block: a32<BR>,
     pub len: u32
 }
@@ -207,7 +286,7 @@ pub struct GenericBlock {
 }
 
 // TODO: make generic over count type
-pub struct Table<T>(Vec<T>);
+pub struct Table<T>(pub Vec<T>);
 
 impl<Arg: Copy + 'static, BR: BinRead<Args=Arg>> BinRead for Table<BR> {
     type Args = Arg;
@@ -219,7 +298,9 @@ impl<Arg: Copy + 'static, BR: BinRead<Args=Arg>> BinRead for Table<BR> {
     }
 
     fn after_parse<R: Read + Seek>(&mut self, reader: &mut R, ro: &ReadOptions, args: Self::Args) -> BinResult<()> {
-        self.0.after_parse(reader, ro, args)
+        let mut temp_options = ro.clone();
+        temp_options.count = Some(u32::read_options(reader, ro, ())? as usize);
+        self.0.after_parse(reader, &temp_options, args)
     }
 }
 
@@ -239,7 +320,13 @@ impl<Arg: Any + Copy, BR: BinRead<Args=(u8, Arg)>> BinRead for MultiReference<BR
         if layout.is_relative != 0 {
             Ok(MultiReference::Relative(layout.ty, r32::read_options(reader, ro, (layout.ty, args))?))
         } else {
-            Ok(MultiReference::Absolute(layout.ty, a32::read_options(reader, ro, (layout.ty, args))?))
+            println!("Warning: absolute reference at pos: {:X}", reader.seek(SeekFrom::Current(0))? - 4);
+            let abs: a32<BR> = a32::read_options(reader, ro, (layout.ty, args))?;
+            // todo: move into AbsPtr?
+            let mut error = Some(||{});
+            error = None;
+            binread::error::assert(reader, abs.ptr() != 0u32, "abs.ptr() != 0", error)?;
+            Ok(MultiReference::Absolute(layout.ty, abs))
         }
     }
 
@@ -251,6 +338,26 @@ impl<Arg: Any + Copy, BR: BinRead<Args=(u8, Arg)>> BinRead for MultiReference<BR
     }
 }
 
+impl<BR: BinRead> Deref for MultiReference<BR> {
+    type Target = BR;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            MultiReference::Relative(_, rel) => rel.deref(),
+            MultiReference::Absolute(_, abs) => abs.deref()
+        }
+    }
+}
+
+impl<BR: BinRead> DerefMut for MultiReference<BR> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            MultiReference::Relative(_, rel) => rel.deref_mut(),
+            MultiReference::Absolute(_, abs) => abs.deref_mut()
+        }
+    }
+}
+
 pub struct Single<BR: BinRead>(BR);
 
 impl<BR: BinRead> BinRead for Single<BR> {
@@ -258,15 +365,21 @@ impl<BR: BinRead> BinRead for Single<BR> {
 
     fn read_options<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, args: Self::Args) -> BinResult<Self> {
         let (ty, args) = args;
-        let mut error = Some(||{});
-        error = None;
-        binread::error::assert(reader, ty == 1, "ty == 1", error)?;
-        Ok(Single(BR::read_options(reader, ro, args)?))
+        // let mut error = Some(||{});
+        // error = None;
+        //binread::error::assert(reader, ty == 0, "ty == 0", error)?;
+        if ty != 0 {
+            println!("Unknown type encountered! type(0x{:X} != 0 in single type reference! pos: 0x{:X}, offset: 0x{:X}", ty,  reader.seek(SeekFrom::Current(0))?, ro.offset)
+        }
+        let mut temp = BR::read_options(reader, ro, args)?;
+        // TODO: still need to figure out when and where this should be called
+        temp.after_parse(reader, ro, args)?;
+        Ok(Single(temp))
     }
 
-    fn after_parse<R: Read + Seek>(&mut self, reader: &mut R, ro: &ReadOptions, args: Self::Args) -> BinResult<()> {
-        self.0.after_parse(reader, ro, args.1)
-    }
+    // fn after_parse<R: Read + Seek>(&mut self, reader: &mut R, ro: &ReadOptions, args: Self::Args) -> BinResult<()> {
+    //     self.0.after_parse(reader, ro, args.1)
+    // }
 }
 
 pub struct Reference<BR: BinRead>(MultiReference<Single<BR>>);
@@ -283,11 +396,25 @@ impl<BR: BinRead> BinRead for Reference<BR> {
     }
 }
 
-#[derive(BinRead)]
+impl<BR: BinRead> Deref for Reference<BR> {
+    type Target = BR;
+
+    fn deref(&self) -> &Self::Target {
+        &(self.0).0
+    }
+}
+
+impl<BR: BinRead> DerefMut for Reference<BR> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut (self.0).0
+    }
+}
+
+#[derive(BinRead, Debug)]
 pub struct ReferenceLayout {
-    is_relative: u8,
-    ty: u8,
-    padding: u16
+    pub is_relative: u8,
+    pub ty: u8,
+    pub padding: u16
 }
 
 #[derive(BinRead)]
@@ -297,8 +424,29 @@ pub enum SoundEncoding {
     DspAdpcm = 2
 }
 
-#[derive(BinRead)]
+#[derive(BinRead, Debug)]
 pub struct TypedId {
     ty: u8,
     id: [u8; 3] // u24
+}
+
+
+pub struct DerefTest<BR: BinRead>(pub BR);
+
+impl<BR: BinRead> BinRead for DerefTest<BR> {
+    type Args = BR::Args;
+
+    fn read_options<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, args: Self::Args) -> BinResult<Self> {
+        let mut ret = BR::read_options(reader, ro, args)?;
+        ret.after_parse(reader, ro, args)?;
+        Ok(DerefTest(ret))
+    }
+}
+
+impl<BR: BinRead> Deref for DerefTest<BR> {
+    type Target = BR;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }

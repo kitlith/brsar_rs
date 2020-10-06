@@ -6,6 +6,7 @@ use super::info::{SoundInfo, PlayerInfo, GroupInfo, BankInfo};
 use std::convert::TryFrom;
 use std::marker::PhantomData;
 use binread::BinRead;
+use binread::FilePtr32;
 
 // struct SymbolBlock<'a> {
 //     names: Vec<&'a CStr>,
@@ -27,22 +28,23 @@ use binread::BinRead;
 //     const MAGIC: [u8; 4] = *b"SYMB";
 // }
 
-type PatriciaTree<T> = nintendo_patricia_tree::PatriciaTree<TreeData<T>>;
+type PatriciaTree/*<T>*/ = nintendo_patricia_tree::PatriciaTree<TreeData/*<T>*/>;
 
 #[derive(BinRead)]
 pub struct SymbolBlock {
-    string_table: r32<Table<r32<NullString>>>,
-    sound_tree: r32<PatriciaTree<SoundInfo>>,
-    player_tree: r32<PatriciaTree<PlayerInfo>>,
-    group_tree: r32<PatriciaTree<GroupInfo>>,
-    bank_tree: r32<PatriciaTree<BankInfo>>,
+    pub header: BlockHeader,
+    pub string_table: r32<DerefTest<Table<r32<NullString>>>>,
+    pub sound_tree: FilePtr32<PatriciaTree/*<SoundInfo>*/>,
+    pub player_tree: FilePtr32<PatriciaTree/*<PlayerInfo>*/>,
+    pub group_tree: FilePtr32<PatriciaTree/*<GroupInfo>*/>,
+    pub bank_tree: FilePtr32<PatriciaTree/*<BankInfo>*/>,
     //name_table: Table<r32<CString>>, location coincidence.
 }
 
 // TODO: rename to something to do with indices?
 #[derive(BinRead)]
-struct TreeData<T> {
-    string_index: u32,
-    item_index: u32, // in info
-    _phantom: PhantomData<T>
+pub struct TreeData/*<T>*/ {
+    pub string_index: u32,
+    pub item_index: u32, // in info
+    /*_phantom: PhantomData<T>*/
 }

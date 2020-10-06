@@ -22,18 +22,15 @@ dependencies = [
 
 [[package]]
 name = "binread"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2b274b61a3e239ed71c3e2895a667382749ae3027b21448dea145dcdb1e59c7"
+version = "1.3.0"
 dependencies = [
  "binread_derive",
+ "lazy_static",
 ]
 
 [[package]]
 name = "binread_derive"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c50bfe7146390f148f73d6b297fd1000ecc60f77f009c01efa7fd80fc68487"
+version = "1.2.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -48,9 +45,9 @@ checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
 name = "bitvec"
-version = "0.19.1"
+version = "0.19.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8eeadf82f165b01d46ac43adb823d7499bcde82df00293262a4369d23404fee9"
+checksum = "8775e5606af6e145d17376be6d95f98245d393a143b41b7feba50d6b3d8367cd"
 dependencies = [
  "funty",
  "radium",
@@ -152,9 +149,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.21"
+version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36e28516df94f3dd551a587da5357459d9b36d945a7c37c3557928c1c2ff2a2c"
+checksum = "51ef7cd2518ead700af67bf9d1a658d90b6037d77110fd9c0445429d0ba1c6c9"
 dependencies = [
  "unicode-xid",
 ]
@@ -170,9 +167,9 @@ dependencies = [
 
 [[package]]
 name = "radium"
-version = "0.4.1"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64de9a0c5361e034f1aefc9f71a86871ec870e766fe31a009734a989b329286a"
+checksum = "5a333b5f6adeff5a89f2e95dc2ea1ecb5319abbb56212afea6a37f87435338a5"
 
 [[package]]
 name = "strsim"
@@ -206,9 +203,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.41"
+version = "1.0.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6690e3e9f692504b941dc6c3b188fd28df054f7fb8469ab40680df52fdcc842b"
+checksum = "9c51d92969d209b54a98397e1b91c8ae82d8c87a7bb87df0b29aa2ad81454228"
 dependencies = [
  "proc-macro2",
  "quote",

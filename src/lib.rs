@@ -1,5 +1,5 @@
 pub mod common;
-mod brsar;
+pub mod brsar;
 
 #[cfg(test)]
 mod tests {
