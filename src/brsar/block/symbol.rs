@@ -33,11 +33,11 @@ type PatriciaTree/*<T>*/ = nintendo_patricia_tree::PatriciaTree<TreeData/*<T>*/>
 #[derive(BinRead)]
 pub struct SymbolBlock {
     pub header: BlockHeader,
-    pub string_table: r32<DerefTest<Table<r32<NullString>>>>,
-    pub sound_tree: FilePtr32<PatriciaTree/*<SoundInfo>*/>,
-    pub player_tree: FilePtr32<PatriciaTree/*<PlayerInfo>*/>,
-    pub group_tree: FilePtr32<PatriciaTree/*<GroupInfo>*/>,
-    pub bank_tree: FilePtr32<PatriciaTree/*<BankInfo>*/>,
+    pub string_table: r32<Table<r32<NullString>>>,
+    pub sound_tree: r32<PatriciaTree/*<SoundInfo>*/>,
+    pub player_tree: r32<PatriciaTree/*<PlayerInfo>*/>,
+    pub group_tree: r32<PatriciaTree/*<GroupInfo>*/>,
+    pub bank_tree: r32<PatriciaTree/*<BankInfo>*/>,
     //name_table: Table<r32<CString>>, location coincidence.
 }
 

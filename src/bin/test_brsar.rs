@@ -39,11 +39,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for (idx, file) in brsar.info.block.file_table.deref().0.iter().enumerate() {
         let external = file.external_file.as_ref().map(|f| f.0.to_string());
+        //let name = file.file_id.
         println!("{}: (external: {:?})", idx, external);
         for pos in file.file_positions.deref().0.iter() {
             let group_name = brsar.symbol.block.group_tree
                 .get(pos.group_index as usize)
-                .and_then(|group| (brsar.symbol.block.string_table.0).0.get(group.string_index as usize))
+                .and_then(|group| (brsar.symbol.block.string_table.0).get(group.string_index as usize))
                 .map(|name| name.to_string())
                 .unwrap_or_else(|| pos.group_index.to_string());
             println!("    {}: {}", group_name, pos.item_index);

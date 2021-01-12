@@ -124,8 +124,8 @@ pub struct FileInfo {
     pub file_size: u32,
     pub archive_size: u32, // "length of audio data, null for external or rseq"
     pub file_id: s32, // RhythmRevolution not clear on what this is, maybe an entry number? always 0xFFFFFFFF according to tockdom
-    //#[br(try)]
-    pub external_file: u64, //Option<DerefTest<Reference<NullString>>>,
+    #[br(try)]
+    pub external_file: Option<DerefTest<Reference<NullString>>>,
     // "offset to second subsection, or external file name" is this to GroupEntry or Table<GroupEntry>?
     pub file_positions: Reference<Table<Reference<FilePosition>>>,
     // tockdom places a single FilePosition here:

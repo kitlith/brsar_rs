@@ -16,6 +16,7 @@ debug_template = ["binread/debug_template", "nintendo_patricia_tree/debug_templa
 [dependencies]
 nintendo_patricia_tree = { path = "nintendo_patricia_tree" }
 binread = {version = "1.*", features = ["debug_template"] }
+binwrite = "*"
 structopt = "*"
 
 [patch.crates-io]

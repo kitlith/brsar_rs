@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             _ => "bin"
         };
 
-        let filename = (symbol.string_table.0).0[sound.string_id as usize].to_string();
+        let filename = (symbol.string_table.0)[sound.string_id as usize].to_string();
         let mut file_path = opt.output_folder.join(&filename);
         file_path.set_extension(output_ext);
 
@@ -55,6 +55,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             } else {
                 println!("Failed to read '{}' from pos: {:X}, size: {:X}", filename, pos, bytes.len());
             }
+        } else {
+            let external = file.external_file.as_ref().map(|f| f.0.to_string());
+            println!("name: {}, external_file: {:?}", filename, external);
         }
     }
 
